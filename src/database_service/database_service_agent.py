@@ -4,25 +4,7 @@ import pandas as pd
 import psycopg2
 
 
-def read_recent_data(db_url: str, table_name: str) -> pd.DataFrame:
-    query = f"""SELECT time, axis_1, axis_2, axis_3, axis_4,
-        axis_5, axis_6, axis_7, axis_8
-        FROM {table_name}
-        WHERE time >= (
-            SELECT MAX(time) FROM {table_name}
-        ) - INTERVAL '90 seconds'
-        ORDER BY time"""
-    with psycopg2.connect(db_url) as connection:
-        return pd.read_sql_query(query, connection)
-
-def stream_DF_to_neon(axis_data: pd.DataFrame, table_name: str, delay_seconds: float, db_url: str):
-    """
-    Streams dataframe rows one by one into a Neon database every `delay_seconds`.
-    """
-    # connect to the Neon postgreSQL database
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
-    # Create DB table if it doesn't exist
+def _ensure_table_exists(connection, table_name: str):
     create_table_query = f"""CREATE TABLE IF NOT EXISTS {table_name} (
     trait VARCHAR(255),
     axis_1 DOUBLE PRECISION,
@@ -41,8 +23,31 @@ def stream_DF_to_neon(axis_data: pd.DataFrame, table_name: str, delay_seconds: f
     axis_14 DOUBLE PRECISION,
     time TIMESTAMP
 )"""
-    cursor.execute(create_table_query)
+    with connection.cursor() as cursor:
+        cursor.execute(create_table_query)
     connection.commit()
+
+
+def read_recent_data(db_url: str, table_name: str) -> pd.DataFrame:
+    query = f"""SELECT time, axis_1, axis_2, axis_3, axis_4,
+        axis_5, axis_6, axis_7, axis_8
+        FROM {table_name}
+        WHERE time >= (
+            SELECT MAX(time) FROM {table_name}
+        ) - INTERVAL '90 seconds'
+        ORDER BY time"""
+    with psycopg2.connect(db_url) as connection:
+        _ensure_table_exists(connection, table_name)
+        return pd.read_sql_query(query, connection)
+
+def stream_DF_to_neon(axis_data: pd.DataFrame, table_name: str, delay_seconds: float, db_url: str):
+    """
+    Streams dataframe rows one by one into a Neon database every `delay_seconds`.
+    """
+    # connect to the Neon postgreSQL database
+    connection = psycopg2.connect(db_url)
+    _ensure_table_exists(connection, table_name)
+    cursor = connection.cursor()
 
 
     print("data stream receiving every 0.1 seconds")

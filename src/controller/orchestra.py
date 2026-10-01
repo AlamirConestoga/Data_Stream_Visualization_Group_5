@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 from src.data_collection.data_collection_agent import read_csv_to_dataframe
@@ -18,6 +19,10 @@ class orchestra:
     @staticmethod
     def activate_web_ui(db_url, table_name="rmbr4_export_data"):
         web_ui_path = Path(__file__).resolve().parents[1] / "web_ui" / "web_ui_interface.py"
+        streamlit_environment = {
+            **os.environ,
+            "STREAMLIT_BROWSER_GATHERUSAGESTATS": "false",
+        }
         return subprocess.Popen([
             sys.executable,
             "-m",
@@ -29,7 +34,11 @@ class orchestra:
             db_url,
             "--table-name",
             table_name,
-        ], cwd=Path(__file__).resolve().parents[2])
+        ],
+            cwd=Path(__file__).resolve().parents[2],
+            env=streamlit_environment,
+            stdin=subprocess.DEVNULL,
+        )
 
     #plot data in real time using matplotlib
 
